@@ -19,10 +19,12 @@
     backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
   .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
   .top{display:flex;align-items:center;gap:14px;height:60px}
-  .logo{font-weight:800;font-size:18px;letter-spacing:.3px;display:flex;align-items:center;gap:9px}
+  .logo{font-weight:800;font-size:18px;letter-spacing:.3px;display:flex;align-items:center;gap:9px;flex:0 0 auto}
   .logo .dot{width:11px;height:11px;border-radius:3px;background:linear-gradient(135deg,var(--acc),var(--grn))}
-  nav{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
-  nav button{background:transparent;border:1px solid transparent;color:var(--mut);
+  nav{display:flex;gap:4px;margin-left:auto;flex:0 1 auto;min-width:0;flex-wrap:nowrap;
+    overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
+  nav button{background:transparent;border:1px solid transparent;color:var(--mut);white-space:nowrap;flex:0 0 auto;
     padding:7px 13px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600;transition:.15s}
   nav button:hover{color:var(--txt);background:var(--panel)}
   nav button.active{color:var(--txt);background:var(--panel);border-color:var(--line)}
@@ -40,6 +42,23 @@
   .g3{grid-template-columns:repeat(3,1fr)}
   .g4{grid-template-columns:repeat(4,1fr)}
   @media(max-width:920px){.g2,.g3,.g4{grid-template-columns:1fr}}
+  @media(max-width:640px){
+    .wrap{padding:0 12px}
+    .top{gap:8px}
+    .logo{font-size:15px}
+    nav button{padding:7px 11px;font-size:13px}
+    main{padding:18px 0 90px}
+    h1{font-size:22px}
+    h2{font-size:18px}
+    .card{padding:14px}
+    .toolbar{gap:8px}
+    th,td{padding:7px 8px}
+    .ers{grid-template-columns:74px 1fr}
+    input,select,textarea,.btn{font-size:16px}   /* 16px stops iOS auto-zoom on focus */
+    .btn{padding:11px 15px}
+    .btn.sm{font-size:13px;padding:8px 12px}
+    .quiz-opt{font-size:15px;padding:12px 13px}
+  }
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
   .card.hl{border-color:#2b3a55;background:linear-gradient(180deg,#141b29,#121722)}
   .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;
@@ -95,9 +114,11 @@
   code{font-family:var(--mono);background:var(--panel2);padding:2px 6px;border-radius:5px;font-size:13px}
   .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:8px}
   .legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
-  .cat-nav{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 4px;position:sticky;top:60px;z-index:20;
+  .cat-nav{display:flex;gap:8px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+    margin:14px 0 4px;position:sticky;top:60px;z-index:20;
     background:var(--bg);padding:10px 0;border-bottom:1px solid var(--line)}
-  .cat-nav button{background:var(--panel);border:1px solid var(--line);color:var(--mut);
+  .cat-nav::-webkit-scrollbar{display:none}
+  .cat-nav button{background:var(--panel);border:1px solid var(--line);color:var(--mut);white-space:nowrap;flex:0 0 auto;
     padding:7px 13px;border-radius:20px;cursor:pointer;font-size:13px;font-weight:600}
   .cat-nav button.active{color:#04121f;background:var(--acc);border-color:var(--acc)}
   .ers{display:grid;grid-template-columns:90px 1fr;gap:6px 12px;font-size:13px;margin-top:8px}
