@@ -314,7 +314,37 @@
 <!-- ============ DATA ============ -->
 <section id="data">
   <h1>Data &amp; Backups</h1>
-  <p class="sub">Everything is in your browser's <code>localStorage</code> — nothing leaves this machine. Export regularly.</p>
+  <p class="sub">Data is stored in your browser's <code>localStorage</code> (instant, offline). Turn on <b>Cloud Sync</b> below to also save to Supabase so your journal follows you across devices.</p>
+
+  <div class="card" id="cloudCard" style="margin-bottom:16px">
+    <div class="row" style="justify-content:space-between">
+      <h3 style="margin:0">☁️ Cloud Sync <span id="cloudPill" class="pill">off</span></h3>
+      <span id="cloudWho" class="muted" style="font-size:13px"></span>
+    </div>
+    <div id="cloudNotConfigured" class="note" style="margin:12px 0 0">
+      Cloud sync isn't set up yet. Follow <code>SYNC_SETUP.md</code> to create a free Supabase project, then paste your <b>Project URL</b> and <b>anon key</b> into the <code>SUPABASE</code> config block near the top of the script in <code>index.html</code>. Until then the app runs in local-only mode (which still persists on this device).
+    </div>
+    <div id="cloudAuth" style="display:none;margin-top:12px">
+      <div class="grid g2">
+        <div><label>Email</label><input id="cl_email" type="email" placeholder="you@example.com" autocomplete="username"/></div>
+        <div><label>Password</label><input id="cl_pass" type="password" placeholder="••••••••" autocomplete="current-password"/></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" onclick="cloudSignIn()">Sign in</button>
+        <button class="btn ghost" onclick="cloudSignUp()">Create account</button>
+        <span id="cl_msg" class="muted" style="font-size:13px"></span>
+      </div>
+    </div>
+    <div id="cloudSignedIn" style="display:none;margin-top:12px">
+      <div class="row">
+        <button class="btn" onclick="cloudSyncNow()">🔄 Sync now</button>
+        <button class="btn ghost" onclick="cloudSignOut()">Sign out</button>
+        <span id="cl_status" class="muted" style="font-size:13px"></span>
+      </div>
+      <p class="muted" style="font-size:12px;margin:10px 0 0">New trades & plans auto-sync. "Sync now" does a full two-way merge (pull from cloud + push local). Deletes made while offline on another device may reappear — delete again while online to clear them.</p>
+    </div>
+  </div>
+
   <div class="grid g2">
     <div class="card">
       <h3>Export / Import</h3>
@@ -340,13 +370,116 @@
 
 </main>
 
+<!-- Supabase client (only used if SUPABASE config below is filled in) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+/* ===================== CLOUD CONFIG =====================
+   To enable multi-device sync, paste your Supabase project values here.
+   See SYNC_SETUP.md for the 5-minute setup. The anon key is SAFE to expose
+   publicly — Row Level Security on the database protects your data.
+   Leave both empty to run in local-only mode (default).                  */
+const SUPABASE = {
+  url: '',       // e.g. 'https://abcdxyz.supabase.co'
+  anonKey: ''    // e.g. 'eyJhbGciOi...'  (the public "anon" key)
+};
+
 /* ===================== STORAGE ===================== */
 const LS_PLANS='ofl_plans_v2', LS_TRADES='ofl_trades_v2';
 const load=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}};
 const save=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
 let plans=load(LS_PLANS,[]), trades=load(LS_TRADES,[]);
 const uid=()=>Math.random().toString(36).slice(2,9);
+const nowIso=()=>new Date().toISOString();
+
+/* ===================== CLOUD SYNC (Supabase, optional) =====================
+   localStorage-first: the UI always reads/writes localStorage instantly.
+   If SUPABASE is configured and the user is signed in, every change is also
+   pushed to Supabase, and sign-in / "Sync now" pulls+merges (last-write-wins
+   by each record's `updated` timestamp). No-ops cleanly when not configured. */
+const cloud=(function(){
+  let sb=null,user=null;
+  const enabled=()=>!!(SUPABASE.url&&SUPABASE.anonKey&&window.supabase);
+  const tbl=k=>k==='trades'?'trades':'plans';
+  const setMsg=m=>{const e=document.getElementById('cl_msg');if(e)e.textContent=m||'';};
+  const setStatus=m=>{const e=document.getElementById('cl_status');if(e)e.textContent=m||'';};
+  function ui(){
+    const pill=document.getElementById('cloudPill');if(!pill)return;
+    const notCfg=document.getElementById('cloudNotConfigured'),
+      auth=document.getElementById('cloudAuth'),inn=document.getElementById('cloudSignedIn'),
+      who=document.getElementById('cloudWho');
+    if(!enabled()){pill.textContent='off';pill.className='pill';notCfg.style.display='';auth.style.display='none';inn.style.display='none';who.textContent='';return;}
+    notCfg.style.display='none';
+    if(user){pill.textContent='synced';pill.className='pill grn';auth.style.display='none';inn.style.display='';who.textContent=user.email||'';}
+    else{pill.textContent='sign in';pill.className='pill yel';auth.style.display='';inn.style.display='none';who.textContent='';}
+  }
+  async function init(){
+    if(!enabled()){ui();return;}
+    try{
+      sb=window.supabase.createClient(SUPABASE.url,SUPABASE.anonKey);
+      const {data}=await sb.auth.getSession();
+      user=data&&data.session?data.session.user:null;
+      sb.auth.onAuthStateChange((_e,s)=>{user=s?s.user:null;ui();});
+      ui();
+      if(user) await syncNow();
+    }catch(e){setStatus('Init error: '+e.message);}
+  }
+  async function signIn(email,pass){
+    if(!enabled())return;setMsg('Signing in…');
+    const {data,error}=await sb.auth.signInWithPassword({email,password:pass});
+    if(error){setMsg(error.message);return;}
+    user=data.user;setMsg('');ui();await syncNow();
+  }
+  async function signUp(email,pass){
+    if(!enabled())return;setMsg('Creating account…');
+    const {data,error}=await sb.auth.signUp({email,password:pass});
+    if(error){setMsg(error.message);return;}
+    if(data.session){user=data.user;setMsg('');ui();await syncNow();}
+    else setMsg('Account created — if email confirmation is on, confirm via email then sign in.');
+  }
+  async function signOut(){if(sb)await sb.auth.signOut();user=null;ui();}
+  async function upsert(kind,obj){
+    if(!sb||!user)return;
+    try{await sb.from(tbl(kind)).upsert({id:obj.id,user_id:user.id,payload:obj,updated_at:obj.updated||nowIso()});}catch(e){}
+  }
+  async function remove(kind,id){
+    if(!sb||!user)return;try{await sb.from(tbl(kind)).delete().eq('id',id);}catch(e){}
+  }
+  async function removeMany(ids){
+    if(!sb||!user)return;
+    try{if(ids.trades&&ids.trades.length)await sb.from('trades').delete().in('id',ids.trades);
+        if(ids.plans&&ids.plans.length)await sb.from('plans').delete().in('id',ids.plans);}catch(e){}
+  }
+  async function pushAll(){
+    if(!sb||!user)return;
+    const row=o=>({id:o.id,user_id:user.id,payload:o,updated_at:o.updated||nowIso()});
+    try{if(trades.length)await sb.from('trades').upsert(trades.map(row));
+        if(plans.length)await sb.from('plans').upsert(plans.map(row));}catch(e){}
+  }
+  function mergeById(local,remote){
+    const map={};local.forEach(x=>map[x.id]={...x});
+    remote.forEach(s=>{const l=map[s.id];if(!l||(s.updated||'')>=(l.updated||''))map[s.id]=s;});
+    return Object.values(map);
+  }
+  async function pull(){
+    if(!sb||!user)return;
+    const tr=await sb.from('trades').select('payload');
+    const pl=await sb.from('plans').select('payload');
+    if(tr.data){trades=mergeById(trades,tr.data.map(r=>r.payload).filter(Boolean));save(LS_TRADES,trades);}
+    if(pl.data){plans=mergeById(plans,pl.data.map(r=>r.payload).filter(Boolean));save(LS_PLANS,plans);}
+  }
+  async function syncNow(){
+    if(!sb||!user)return;setStatus('Syncing…');
+    try{await pull();await pushAll();
+      renderPlans();renderJournal();renderLeaderboard();renderStoreInfo();
+      setStatus('Synced ✓ '+new Date().toLocaleTimeString());
+    }catch(e){setStatus('Sync error: '+e.message);}
+  }
+  return {init,signIn,signUp,signOut,syncNow,upsert,remove,removeMany,pushAll,ui};
+})();
+function cloudSignIn(){cloud.signIn(pv('cl_email'),pv('cl_pass'));}
+function cloudSignUp(){cloud.signUp(pv('cl_email'),pv('cl_pass'));}
+function cloudSignOut(){cloud.signOut();}
+function cloudSyncNow(){cloud.syncNow();}
 
 /* ===================== COLORS ===================== */
 const G='#27d39a',R='#ff5d6c',P='#9d7bff',Y='#ffce5a',A='#4ea1ff',M='#8b97ad';
@@ -1033,13 +1166,14 @@ function planFromStrategy(id){
 function savePlan(){
   const name=document.getElementById('pl_name').value.trim();
   if(!name){alert('Give the plan a name');return;}
-  plans.push({id:uid(),name,sym:pv('pl_sym'),tf:pv('pl_tf'),strat:pv('pl_strat'),dir:pv('pl_dir'),
-    entry:pv('pl_entry'),stop:pv('pl_stop'),tp:pv('pl_tp'),rr:pv('pl_rr'),risk:pv('pl_risk'),max:pv('pl_max'),inval:pv('pl_inval')});
-  save(LS_PLANS,plans);clearPlanForm();renderPlans();
+  const o={id:uid(),name,sym:pv('pl_sym'),tf:pv('pl_tf'),strat:pv('pl_strat'),dir:pv('pl_dir'),
+    entry:pv('pl_entry'),stop:pv('pl_stop'),tp:pv('pl_tp'),rr:pv('pl_rr'),risk:pv('pl_risk'),max:pv('pl_max'),inval:pv('pl_inval'),updated:nowIso()};
+  plans.push(o);
+  save(LS_PLANS,plans);clearPlanForm();renderPlans();cloud.upsert('plans',o);
 }
 const pv=id=>document.getElementById(id).value;
 function clearPlanForm(){['pl_name','pl_entry','pl_stop','pl_tp','pl_inval'].forEach(i=>document.getElementById(i).value='');}
-function delPlan(id){plans=plans.filter(p=>p.id!==id);save(LS_PLANS,plans);renderPlans();}
+function delPlan(id){plans=plans.filter(p=>p.id!==id);save(LS_PLANS,plans);renderPlans();cloud.remove('plans',id);}
 function renderPlans(){
   const el=document.getElementById('planList');
   if(!plans.length){el.innerHTML='<div class="empty">No plans yet. Build one, or send a strategy here.</div>';return;}
@@ -1074,9 +1208,9 @@ function saveTrade(){
   const editId=pv('t_editid');
   const o={id:editId||uid(),date:pv('t_date')||todayStr(),mode:pv('t_mode'),strat:pv('t_strat'),sym:pv('t_sym'),
     dir:pv('t_dir'),tf:pv('t_tf'),out:pv('t_out'),entry:pv('t_entry'),stop:pv('t_stopp'),exit:pv('t_exit'),
-    r,conf:getConf(),img:pv('t_img'),notes:pv('t_notes')};
+    r,conf:getConf(),img:pv('t_img'),notes:pv('t_notes'),updated:nowIso()};
   if(editId)trades=trades.map(t=>t.id===editId?o:t);else trades.push(o);
-  save(LS_TRADES,trades);clearTradeForm();renderJournal();
+  save(LS_TRADES,trades);clearTradeForm();renderJournal();cloud.upsert('trades',o);
 }
 function clearTradeForm(){['t_entry','t_stopp','t_exit','t_r','t_img','t_notes'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('t_editid').value='';document.getElementById('t_savebtn').textContent='Add trade';
@@ -1090,7 +1224,7 @@ function editTrade(id){
   set('t_exit',t.exit);set('t_r',t.r);set('t_img',t.img||'');set('t_notes',t.notes||'');setConf(t.conf);
   document.getElementById('t_savebtn').textContent='Update trade';window.scrollTo({top:0,behavior:'smooth'});
 }
-function delTrade(id){if(confirm('Delete this trade?')){trades=trades.filter(t=>t.id!==id);save(LS_TRADES,trades);renderJournal();}}
+function delTrade(id){if(confirm('Delete this trade?')){trades=trades.filter(t=>t.id!==id);save(LS_TRADES,trades);renderJournal();cloud.remove('trades',id);}}
 function filteredTrades(){const fs=pv('filt_strat'),fm=pv('filt_mode');
   return trades.filter(t=>(!fs||t.strat===fs)&&(fm==='All'||t.mode===fm));}
 function statsFor(list){
@@ -1183,6 +1317,7 @@ function importData(e){
   rd.onload=()=>{try{const d=JSON.parse(rd.result);if(d.plans)plans=d.plans;if(d.trades)trades=d.trades;
     save(LS_PLANS,plans);save(LS_TRADES,trades);renderPlans();renderJournal();renderLeaderboard();renderStoreInfo();
     alert('Imported '+(d.trades?.length||0)+' trades, '+(d.plans?.length||0)+' plans.');
+    cloud.pushAll();
   }catch(err){alert('Bad file: '+err.message);}};rd.readAsText(f);e.target.value='';
 }
 function exportCSV(){
@@ -1192,7 +1327,11 @@ function exportCSV(){
   const blob=new Blob([lines.join('\n')],{type:'text/csv'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='orderflow-trades.csv';a.click();
 }
-function wipeAll(){if(confirm('Delete ALL plans and trades on this machine?')){plans=[];trades=[];save(LS_PLANS,plans);save(LS_TRADES,trades);renderPlans();renderJournal();renderLeaderboard();renderStoreInfo();}}
+function wipeAll(){if(confirm('Delete ALL plans and trades on this machine?')){
+  const ids={trades:trades.map(t=>t.id),plans:plans.map(p=>p.id)};
+  plans=[];trades=[];save(LS_PLANS,plans);save(LS_TRADES,trades);renderPlans();renderJournal();renderLeaderboard();renderStoreInfo();
+  if(confirm('Also delete from the cloud (all signed-in devices)? Cancel = wipe this device only.')) cloud.removeMany(ids);
+}}
 function renderStoreInfo(){
   const bytes=(localStorage.getItem(LS_TRADES)||'').length+(localStorage.getItem(LS_PLANS)||'').length;
   document.getElementById('storeInfo').innerHTML=`Plans: <b>${plans.length}</b> · Trades: <b>${trades.length}</b> · ~${(bytes/1024).toFixed(1)} KB used.`;
@@ -1308,6 +1447,7 @@ renderPlans();
 renderJournal();
 renderStoreInfo();
 startQuiz(false);
+cloud.init();
 </script>
 </body>
 </html>

@@ -39,10 +39,10 @@ Or double-click `index.html` in a file browser.
 
 ## Data & privacy
 
-- **Everything is stored locally** in your browser's `localStorage`. Nothing is uploaded anywhere.
-- Storage keys: `ofl_plans_v2` (plans), `ofl_trades_v2` (trades).
-- **Data is per-browser, per-machine.** If you clear browser data or switch browsers/computers, it won't follow you.
-- **Back up regularly:** Data tab → *Export JSON*. Restore with *Import JSON*.
+- **Local-first:** data is stored in your browser's `localStorage` (instant, offline). Keys: `ofl_plans_v2`, `ofl_trades_v2`.
+- **Optional cloud sync (multi-device):** turn on **Cloud Sync** in the Data tab to also save to **Supabase**, so your journal follows you across devices. Setup is a one-time ~5-min job — see **`SYNC_SETUP.md`**. Until configured, the app is local-only (default).
+- With sync on, data is private to your account (protected by Supabase Row Level Security). Nothing is shared publicly.
+- **Back up anyway:** Data tab → *Export JSON*. Restore with *Import JSON*.
 
 > ⚠️ Because data lives in `localStorage`, the storage keys are versioned (`_v2`). If a future change alters the trade/plan data shape, bump the version (see `ARCHITECTURE.md`) — but know that bumping the key hides old data until migrated.
 
@@ -75,7 +75,8 @@ Or double-click `index.html` in a file browser.
 orderflow-lab/
 ├── index.html        # the entire app (HTML + CSS + JS inline)
 ├── README.md         # this file
-└── ARCHITECTURE.md   # how the code is organized + how to extend it
+├── ARCHITECTURE.md   # how the code is organized + how to extend it
+└── SYNC_SETUP.md     # one-time Supabase setup for multi-device cloud sync
 ```
 
 To **add a strategy, quiz question, illustration, or profile shape**, see `ARCHITECTURE.md` — it has copy-paste templates for each.

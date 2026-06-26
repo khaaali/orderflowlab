@@ -232,9 +232,19 @@ Shapes use a **separate renderer** (`vpHist`) — a horizontal histogram, *not* 
   entry, stop, exit,     // strings (raw input)
   r,                     // number — the result in R (drives ALL stats)
   conf:[…],              // array of confluence strings ticked
-  img, notes
+  img, notes,
+  updated                // ISO timestamp — used for cloud merge (last-write-wins)
 }
 ```
+
+### Cloud sync (optional — Supabase)
+- Config: the `SUPABASE = { url, anonKey }` block at the top of the script. Empty = local-only (default).
+- Library: loaded via `<script src="…@supabase/supabase-js@2">` before the main script (exposes `window.supabase`).
+- The `cloud` IIFE wraps all sync: `init, signIn, signUp, signOut, syncNow, upsert, remove, removeMany, pushAll`.
+- **localStorage-first:** mutations (`saveTrade`/`delTrade`/`savePlan`/`delPlan`) write localStorage first, then call `cloud.upsert/remove` (no-ops if not configured/signed in).
+- **Merge:** `pull()` fetches the user's rows and merges by `id`, newest `updated` wins. `syncNow()` = pull + pushAll.
+- **Schema:** Supabase tables `trades`/`plans` each store `{ id, user_id (default auth.uid()), payload jsonb, updated_at }` with Row Level Security scoping rows to the owner. Full SQL in `SYNC_SETUP.md`.
+- **Known limit:** deletes have no tombstones, so an offline delete on one device can be re-pushed by another. Delete again while online to clear.
 
 ### Stats (computed, not stored) — see `statsFor(list)`
 `n, winrate, avgWin, avgLoss, totalR, pf (profit factor), expectancy, maxDD`.
@@ -276,8 +286,10 @@ Then open `index.html` and click through the tab(s) you touched. Check the **bro
 ## 7. Backlog / improvement ideas
 
 **Quick wins**
+- [x] **Multi-device cloud sync** (Supabase, localStorage-first). See `SYNC_SETUP.md`.
 - [ ] **Position-size calculator** (account balance + risk% + entry/stop → position size / qty). Add as a small widget in Plan or a new mini-tab.
 - [ ] **Tag each trade with the volume-profile shape** (D/P/b/B/I). Add a `shape` field to the trade form + object, then a Leaderboard view "expectancy by shape" — reveals which conditions your edges actually work in.
+- [ ] **Delete tombstones** so offline deletes propagate cleanly across devices.
 - [ ] **Printable cheat-sheet** view (one page, all 16 setups' trigger/entry/exit/inval) with `@media print` CSS.
 - [ ] **Filter Journal by date range / direction / outcome.**
 
@@ -297,5 +309,6 @@ Then open `index.html` and click through the tab(s) you touched. Check the **bro
 
 ## 8. Changelog (keep this updated as you go)
 
+- **v2.1** — Optional Supabase cloud sync (multi-device), localStorage-first with last-write-wins merge. Added `updated` field to trades/plans. New `SYNC_SETUP.md`.
 - **v2** — Rebuilt: 16 categorized strategies with mirrored long/short illustrations + entry/exit/invalidation, 18-question quiz, volume-profile shapes (D/P/b/B/I). Storage keys bumped to `_v2`.
 - **v1** — Initial lab: 6 strategies, concept explainers, plan/journal/leaderboard.
