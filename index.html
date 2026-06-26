@@ -10,6 +10,21 @@
     --txt:#e6edf6; --mut:#8b97ad; --acc:#4ea1ff; --grn:#27d39a; --red:#ff5d6c;
     --yel:#ffce5a; --pur:#9d7bff; --radius:14px; --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
   }
+  /* ---- LIGHT THEME ---- */
+  :root[data-theme="light"]{
+    --bg:#f6f8fb; --panel:#ffffff; --panel2:#eef1f6; --line:#d7dde7;
+    --txt:#1b2330; --mut:#5a6675;
+    --acc:#2f7fe0; --grn:#0c9c6c; --red:#d83a48; --yel:#b07d09; --pur:#7a52e0;
+  }
+  [data-theme="light"] header{ background:rgba(255,255,255,.9); }
+  [data-theme="light"] .card.hl{ background:linear-gradient(180deg,#ffffff,#f3f6fb); }
+  [data-theme="light"] .note{ background:#eef4fc; border-color:#cfe0f5; }
+  [data-theme="light"] .warn{ background:#fdf0f1; border-color:#f3c9cd; }
+  [data-theme="light"] .ok{ background:#eafaf3; border-color:#bfe9d6; }
+  [data-theme="light"] .quiz-opt.correct{ background:#eafaf3; }
+  [data-theme="light"] .quiz-opt.wrong{ background:#fdf0f1; }
+  [data-theme="light"] .explain{ background:#eef4fc; }
+  /* diagrams keep their dark panel in both themes — candle colours need it */
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--txt);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -28,6 +43,9 @@
     padding:7px 13px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600;transition:.15s}
   nav button:hover{color:var(--txt);background:var(--panel)}
   nav button.active{color:var(--txt);background:var(--panel);border-color:var(--line)}
+  .theme-btn{flex:0 0 auto;background:var(--panel);border:1px solid var(--line);color:var(--txt);
+    width:34px;height:34px;border-radius:9px;cursor:pointer;font-size:15px;line-height:1}
+  .theme-btn:hover{border-color:var(--acc)}
   main{padding:26px 0 90px}
   section{display:none;animation:fade .25s ease}
   section.active{display:block}
@@ -138,33 +156,73 @@
   .progressbar{height:8px;background:var(--panel2);border-radius:6px;overflow:hidden;margin:8px 0}
   .progressbar > i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--grn))}
 
-  /* ===================== PRINT / PDF (landscape) ===================== */
+  /* ===================== PRINT / PDF — handbook (2-column landscape) ===================== */
   @media print{
     @page{ size:A4 landscape; margin:10mm; }
-    /* keep the dark theme + diagram colours in the PDF */
-    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
-    body{ background:var(--bg); }
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; box-shadow:none !important; }
+    html,body{ background:#fff !important; color:#111 !important; font-size:8.6pt; line-height:1.34; }
     .wrap{ max-width:none; padding:0; }
-    /* show ONLY Learn + Strategies, regardless of active tab */
     section{ display:none !important; }
     #learn, #strategies{ display:block !important; }
-    /* hide chrome / interactive bits */
-    header, .cat-nav, .no-print, .flex-end, details > summary{ display:none !important; }
-    /* expand collapsed checklists so they print */
-    details{ background:transparent; border:none; padding:0; }
+    header, .cat-nav, .no-print, .flex-end, details > summary, .legend{ display:none !important; }
+    details{ background:transparent !important; border:none !important; padding:0 !important; margin:5px 0 0 !important; }
     details > *{ display:block !important; }
-    /* avoid splitting cards / diagrams across pages */
-    .card{ break-inside:avoid; page-break-inside:avoid; }
-    .grid{ break-inside:avoid; }
-    svg.illus{ break-inside:avoid; }
-    h1,h2,h3{ break-after:avoid; page-break-after:avoid; }
-    h2{ break-before:auto; }
-    /* start Strategies on a fresh page */
+
+    /* typography */
+    h1{ font-size:15pt; margin:0 0 2px; }
+    h3{ font-size:9.5pt; margin:0 0 3px; }
+    h4{ color:#555 !important; font-size:7.4pt; margin:0 0 3px; }
+    .sub,.muted{ color:#555 !important; max-width:none; }
+    p{ margin:4px 0; }
+    a{ color:#111 !important; text-decoration:none; }
+
+    /* flatten panels to light bordered blocks */
+    .card,.card.hl,.dirbox{ background:#fff !important; border:1px solid #d8d8d8 !important;
+      border-radius:4px; padding:7px !important; color:#111 !important; margin:0 0 7px; }
+    .note,.warn,.ok{ background:#f6f6f6 !important; border:1px solid #ddd !important;
+      border-left:3px solid #999 !important; color:#222 !important; }
+    .pill,.pill.grn,.pill.red,.pill.yel,.pill.pur,.pill.acc{
+      background:#eee !important; color:#333 !important; border:1px solid #ccc !important; }
+    /* keep only the SEMANTIC colours (darkened for paper) */
+    .pos,.ers .e{ color:#0a7d52 !important; }
+    .neg,.ers .i{ color:#b3261e !important; }
+    .ers .x{ color:#1f5fa8 !important; }
+    .ers{ grid-template-columns:48px 1fr; gap:2px 6px; }
+
+    /* compact framed diagrams (candles keep colour — that's the lesson) */
+    svg.illus{ height:26mm; width:auto; max-width:100%; background:#0d111a !important;
+      border:1px solid #ccc; border-radius:3px; }
+
+    /* ---- handbook: TWO cards per row via FLOATS ----
+       (Chrome ignores column-fill:auto in print → multicol leaves pages
+        half-empty; column-span:all drops content. Floats pack & paginate
+        densely and reliably.) */
+    #learnList, #shapesBlock, #strategyList, #strategyList .grid{ display:block !important; }
+    #learnList::after, #shapesBlock::after, #strategyList .grid::after{ content:""; display:block; clear:both; }
+    .litem,
+    #shapesBlock > .card,
+    #strategyList .grid > .card{ float:left; width:49%; margin:0 0 7px; }
+    .litem:nth-child(odd),
+    #shapesBlock > .card:nth-child(odd),
+    #strategyList .grid > .card:nth-child(odd){ margin-right:2%; clear:left; }
+    .litem, .card{ break-inside:avoid; page-break-inside:avoid; }
+    /* category headers span both columns like a book chapter title */
+    #strategyList > h2{ clear:both; width:100%; font-size:11pt; margin:8px 0 6px;
+      padding-bottom:3px; border-bottom:1.5px solid #333; break-after:avoid; }
+    .litem h2{ font-size:10.5pt; margin:0 0 5px; padding-bottom:2px; border-bottom:1px solid #ccc; break-after:avoid; }
+    .litem{ margin:0 0 8px; }
+
+    /* learn: stack the illustration panel above the text block … */
+    .litem > .grid{ display:block !important; }
+    .litem > .grid > div + div{ margin-top:5px; }
+    /* … but keep long/short diagrams AND the dir text-blocks SIDE-BY-SIDE,
+       which roughly halves each card's height so more fit per page */
+    .sdiag, .sblocks, .litem .card .grid.g2{
+      display:grid !important; grid-template-columns:1fr 1fr !important; gap:5px !important; }
+    .sdiag svg.illus, .litem svg.illus{ height:21mm; }
+
+    h1,h3{ break-after:avoid; page-break-after:avoid; }
     #strategies{ break-before:page; page-break-before:always; }
-    a{ color:var(--txt); text-decoration:none; }
-    /* slightly denser type for paper */
-    .card{ padding:12px; }
-    .sub{ max-width:none; }
   }
 </style>
 </head>
@@ -181,6 +239,7 @@
       <button data-tab="leaderboard">🏆 Leaderboard</button>
       <button data-tab="data">⚙️ Data</button>
     </nav>
+    <button id="themeBtn" class="theme-btn no-print" onclick="toggleTheme()" title="Toggle light / dark">🌙</button>
   </div>
 </header>
 
@@ -191,8 +250,8 @@
   <h1>Foundations of Orderflow</h1>
   <p class="sub">Eight building blocks. Master these and the Strategy tab becomes obvious — every setup is just a combination of these. The one mental model that ties it all together: <b>price moves to find liquidity (resting orders), then rebalances inefficiency.</b> Study on BTCUSDT first (clean structure), then apply to HYPE.</p>
   <div class="toolbar no-print">
-    <button class="btn" onclick="printDoc()">🖨 Save as PDF (Learn + Strategies, landscape)</button>
-    <span class="muted" style="font-size:13px">Opens your browser print dialog → choose <b>Landscape</b> + <b>Save as PDF</b>. All checklists auto-expand.</span>
+    <button class="btn" onclick="printDoc()">🖨 Print / Save as PDF</button>
+    <span class="muted" style="font-size:13px">Tip: switch to the ☀️ <b>light theme</b> (top-right) first, then in the dialog pick <b>Landscape</b>. Prints Learn + Strategies, everything expanded.</span>
   </div>
 
   <div class="note">
@@ -216,8 +275,8 @@
   <h1>Strategy Playbook</h1>
   <p class="sub">16 rule-based setups in 5 categories. Each shows the <b>long</b> and <b>short</b> version (the short is the exact mirror), plus <b>Entry · Exit · Invalidation</b>, a confluence checklist, and the mistakes that kill it. Range setups are flagged. Backtest 30–50 samples of one before trusting it.</p>
   <div class="toolbar no-print">
-    <button class="btn" onclick="printDoc()">🖨 Save as PDF (Learn + Strategies, landscape)</button>
-    <span class="muted" style="font-size:13px">Tip: this prints <b>all</b> categories regardless of the filter below.</span>
+    <button class="btn" onclick="printDoc()">🖨 Print / Save as PDF</button>
+    <span class="muted" style="font-size:13px">Prints <b>all</b> categories regardless of the filter below. Use ☀️ light theme + Landscape.</span>
   </div>
   <div class="cat-nav" id="catNav"></div>
   <div id="strategyList"></div>
@@ -816,6 +875,7 @@ const LEARN=[
 ];
 function renderLearn(){
   document.getElementById('learnList').innerHTML=LEARN.map(L=>`
+    <div class="litem">
     <h2>${L.n} <span class="pill ${L.cls}">${L.pill}</span></h2>
     <div class="grid g2">
       <div class="card">${L.flip?
@@ -825,6 +885,7 @@ function renderLearn(){
          </div>`
         : scene(SCENES[L.scene](),'long')}</div>
       <div class="card">${L.body}</div>
+    </div>
     </div>`).join('');
 }
 
@@ -1091,15 +1152,15 @@ function renderStrategies(){
           <span class="pill ${s.cls}">${s.type}${s.range?' · range':''}</span>
         </div>
         <p class="muted" style="margin:8px 0">${s.blurb}</p>
-        <div class="grid ${s.range?'':'g2'}" style="margin-bottom:12px">
+        <div class="grid sdiag ${s.range?'':'g2'}" style="margin-bottom:12px">
           <div><h4 class="${s.range?'':'pos'}">${longTitle}</h4>${scene(SCENES[s.scene](),'long')}</div>
           ${shortScene}
         </div>
-        <div class="grid ${s.range?'':'g2'}">
+        <div class="grid sblocks ${s.range?'':'g2'}">
           ${dirBlock(s.long,'pos', s.range?'How to trade it':'Long')}
           ${s.range?'':dirBlock(s.short,'neg','Short')}
         </div>
-        <details style="margin-top:12px"><summary>Checklist &amp; common mistakes</summary>
+        <details open style="margin-top:12px"><summary>Checklist &amp; common mistakes</summary>
           <div class="row" style="margin:8px 0">${s.conf.map(c=>`<span class="pill ${s.cls}">${c}</span>`).join('')}</div>
           <p class="muted" style="margin:6px 0"><b>Mistakes that kill it:</b> ${s.mistakes}</p>
         </details>
@@ -1494,24 +1555,31 @@ function renderShapes(){
     </div>`).join('');
 }
 
-/* ===================== PRINT / PDF ===================== */
-// Print Learn + Strategies only, in landscape. Temporarily expand every
-// <details> (checklists/mistakes) so they appear in the PDF, then restore.
-function printDoc(){
-  const ds=[...document.querySelectorAll('#learn details, #strategies details')];
-  ds.forEach(d=>{ d.dataset._open=d.open?'1':'0'; d.open=true; });
-  // ensure both sections are renderable even if a tab filter hid strategies
-  const prevCat=activeCat; if(activeCat!=='all'){ activeCat='all'; renderStrategies(); }
-  window._printRestore=()=>{
-    ds.forEach(d=>{ d.open=(d.dataset._open==='1'); delete d.dataset._open; });
-    if(prevCat!=='all'){ activeCat=prevCat; renderStrategies(); }
-    window._printRestore=null;
-  };
-  window.print();
-  // Safari sometimes skips afterprint; restore on a fallback timer too.
-  setTimeout(()=>{ if(window._printRestore) window._printRestore(); }, 1500);
+/* ===================== THEME (light / dark) ===================== */
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  const b=document.getElementById('themeBtn'); if(b) b.textContent = (t==='light'?'☀️':'🌙');
 }
-window.addEventListener('afterprint', ()=>{ if(window._printRestore) window._printRestore(); });
+function toggleTheme(){
+  const next = (document.documentElement.getAttribute('data-theme')==='light') ? 'dark' : 'light';
+  try{ localStorage.setItem('ofl_theme', next); }catch(e){}
+  applyTheme(next);
+}
+applyTheme((function(){ try{ return localStorage.getItem('ofl_theme'); }catch(e){ return null; } })() || 'dark');
+
+/* ===================== PRINT ===================== */
+// Direct browser print (Cmd/Ctrl+P) or the buttons. The @media print stylesheet
+// forces a light, low-ink layout regardless of the on-screen theme. beforeprint
+// makes sure ALL strategy categories are shown even if a filter is active.
+function printDoc(){ window.print(); }
+window.addEventListener('beforeprint', ()=>{
+  if(typeof activeCat!=='undefined' && activeCat!=='all'){
+    window._prevCat=activeCat; activeCat='all'; renderStrategies();
+  }
+});
+window.addEventListener('afterprint', ()=>{
+  if(window._prevCat){ activeCat=window._prevCat; renderStrategies(); window._prevCat=null; }
+});
 
 /* ===================== INIT ===================== */
 renderLearn();
