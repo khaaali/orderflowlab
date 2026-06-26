@@ -137,6 +137,35 @@
   .explain.show{display:block}
   .progressbar{height:8px;background:var(--panel2);border-radius:6px;overflow:hidden;margin:8px 0}
   .progressbar > i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--grn))}
+
+  /* ===================== PRINT / PDF (landscape) ===================== */
+  @media print{
+    @page{ size:A4 landscape; margin:10mm; }
+    /* keep the dark theme + diagram colours in the PDF */
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    body{ background:var(--bg); }
+    .wrap{ max-width:none; padding:0; }
+    /* show ONLY Learn + Strategies, regardless of active tab */
+    section{ display:none !important; }
+    #learn, #strategies{ display:block !important; }
+    /* hide chrome / interactive bits */
+    header, .cat-nav, .no-print, .flex-end, details > summary{ display:none !important; }
+    /* expand collapsed checklists so they print */
+    details{ background:transparent; border:none; padding:0; }
+    details > *{ display:block !important; }
+    /* avoid splitting cards / diagrams across pages */
+    .card{ break-inside:avoid; page-break-inside:avoid; }
+    .grid{ break-inside:avoid; }
+    svg.illus{ break-inside:avoid; }
+    h1,h2,h3{ break-after:avoid; page-break-after:avoid; }
+    h2{ break-before:auto; }
+    /* start Strategies on a fresh page */
+    #strategies{ break-before:page; page-break-before:always; }
+    a{ color:var(--txt); text-decoration:none; }
+    /* slightly denser type for paper */
+    .card{ padding:12px; }
+    .sub{ max-width:none; }
+  }
 </style>
 </head>
 <body>
@@ -161,6 +190,10 @@
 <section id="learn" class="active">
   <h1>Foundations of Orderflow</h1>
   <p class="sub">Eight building blocks. Master these and the Strategy tab becomes obvious — every setup is just a combination of these. The one mental model that ties it all together: <b>price moves to find liquidity (resting orders), then rebalances inefficiency.</b> Study on BTCUSDT first (clean structure), then apply to HYPE.</p>
+  <div class="toolbar no-print">
+    <button class="btn" onclick="printDoc()">🖨 Save as PDF (Learn + Strategies, landscape)</button>
+    <span class="muted" style="font-size:13px">Opens your browser print dialog → choose <b>Landscape</b> + <b>Save as PDF</b>. All checklists auto-expand.</span>
+  </div>
 
   <div class="note">
     <b>TradingView setup:</b> chart <code>BYBIT:HYPEUSDT.P</code> or <code>BINANCE:BTCUSDT</code>. Add: <b>Volume Profile (Visible Range + Fixed Range)</b>, <b>Session Volume Profile</b>. For real orderflow you need Premium: <b>Cumulative Volume Delta</b> + the <b>Footprint</b> chart. Draw horizontal lines for <b>PDH/PDL, PWH/PWL, daily &amp; weekly open</b>, and the <b>Asia/London/NY</b> session ranges.
@@ -182,6 +215,10 @@
 <section id="strategies">
   <h1>Strategy Playbook</h1>
   <p class="sub">16 rule-based setups in 5 categories. Each shows the <b>long</b> and <b>short</b> version (the short is the exact mirror), plus <b>Entry · Exit · Invalidation</b>, a confluence checklist, and the mistakes that kill it. Range setups are flagged. Backtest 30–50 samples of one before trusting it.</p>
+  <div class="toolbar no-print">
+    <button class="btn" onclick="printDoc()">🖨 Save as PDF (Learn + Strategies, landscape)</button>
+    <span class="muted" style="font-size:13px">Tip: this prints <b>all</b> categories regardless of the filter below.</span>
+  </div>
   <div class="cat-nav" id="catNav"></div>
   <div id="strategyList"></div>
 </section>
@@ -1456,6 +1493,25 @@ function renderShapes(){
       <div class="row" style="margin-top:10px"><span class="pill ${sh.cls}">Use: ${sh.uses}</span></div>
     </div>`).join('');
 }
+
+/* ===================== PRINT / PDF ===================== */
+// Print Learn + Strategies only, in landscape. Temporarily expand every
+// <details> (checklists/mistakes) so they appear in the PDF, then restore.
+function printDoc(){
+  const ds=[...document.querySelectorAll('#learn details, #strategies details')];
+  ds.forEach(d=>{ d.dataset._open=d.open?'1':'0'; d.open=true; });
+  // ensure both sections are renderable even if a tab filter hid strategies
+  const prevCat=activeCat; if(activeCat!=='all'){ activeCat='all'; renderStrategies(); }
+  window._printRestore=()=>{
+    ds.forEach(d=>{ d.open=(d.dataset._open==='1'); delete d.dataset._open; });
+    if(prevCat!=='all'){ activeCat=prevCat; renderStrategies(); }
+    window._printRestore=null;
+  };
+  window.print();
+  // Safari sometimes skips afterprint; restore on a fallback timer too.
+  setTimeout(()=>{ if(window._printRestore) window._printRestore(); }, 1500);
+}
+window.addEventListener('afterprint', ()=>{ if(window._printRestore) window._printRestore(); });
 
 /* ===================== INIT ===================== */
 renderLearn();
